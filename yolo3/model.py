@@ -185,6 +185,8 @@ def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape)
 
 
 def yolo_eval(yolo_outputs,
+#模型输出，格式如下【（?，13,13,255）（?，26,26,255）（?,52,52,255）】 ?:bitch size;
+              # 13-26-52:多尺度预测； 255：预测值（3*（80+5）
               anchors,
               num_classes,
               image_shape,
