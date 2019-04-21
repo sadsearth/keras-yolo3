@@ -55,6 +55,7 @@ if __name__ == '__main__':
         "--input", nargs='?', type=str,required=False,default='./path2your_video',
         help = "Video input path"
     )
+    #python yolo_video.py --input /Users/wangzijian/Desktop/Detection/YOLO/test/jiedao.m4v
 
     parser.add_argument(
         "--output", nargs='?', type=str, default="",
@@ -67,11 +68,15 @@ if __name__ == '__main__':
         """
         Image detection mode, disregard any remaining command line arguments
         """
+        print(FLAGS)  # Namespace(image=True, input='./path2your_video', output='')
+        print(FLAGS.image)  #True
         print("Image detection mode")
         if "input" in FLAGS:
-            print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
+            print(" wang Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
+        print(vars(FLAGS))  # {'image': True, 'input': './path2your_video', 'output': ''}
         detect_img(YOLO(**vars(FLAGS)))
     elif "input" in FLAGS:
+        print(FLAGS)
         detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
     else:
         print("Must specify at least video_input_path.  See usage with --help.")

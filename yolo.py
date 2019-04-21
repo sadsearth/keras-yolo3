@@ -20,13 +20,13 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'model_data/yolo.h5',
-        "anchors_path": 'model_data/yolo_anchors.txt',
-        "classes_path": 'model_data/coco_classes.txt',
-        "score" : 0.3,
-        "iou" : 0.45,
-        "model_image_size" : (416, 416),
-        "gpu_num" : 1,
+        "model_path": 'model_data/yolo.h5',  #训练好的模型
+        "anchors_path": 'model_data/yolo_anchors.txt',  # anchor box 9个， 从小到大排列
+        "classes_path": 'model_data/coco_classes.txt',  #类别数
+        "score" : 0.3,   #score阈值
+        "iou" : 0.45,    #iou阈值
+        "model_image_size" : (416, 416),   #输入图像尺寸
+        "gpu_num" : 1,   #gpu数目
     }
 
     @classmethod
@@ -100,6 +100,7 @@ class YOLO(object):
         return boxes, scores, classes
 
     def detect_image(self, image):
+        # 检测图片，返回画好框的图片
         start = timer()
 
         if self.model_image_size != (None, None):
@@ -112,39 +113,42 @@ class YOLO(object):
             boxed_image = letterbox_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
 
-        print(image_data.shape)
-        image_data /= 255.
+        print(image_data.shape)    #(416,416,3)
+        image_data /= 255.     # 归一化
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
-
+        # 批量添加一维 -> (1,416,416,3) 为了符合网络的输入格式 -> (bitch, w, h, c)
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
-            feed_dict={
-                self.yolo_model.input: image_data,
-                self.input_image_shape: [image.size[1], image.size[0]],
-                K.learning_phase(): 0
+            # 目的为了求boxes,scores,classes，具体计算方式定义在第61行的generate（）函数内。
+            feed_dict={  #喂参数
+                self.yolo_model.input: image_data, #图像数据
+                self.input_image_shape: [image.size[1], image.size[0]],  #图像尺寸
+                K.learning_phase(): 0  #学习模式 0：测试模型。 1：训练模式
             })
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness = (image.size[0] + image.size[1]) // 300
+                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))  # 字体
+        thickness = (image.size[0] + image.size[1]) // 300  # 边框厚度
 
-        for i, c in reversed(list(enumerate(out_classes))):
-            predicted_class = self.class_names[c]
-            box = out_boxes[i]
-            score = out_scores[i]
+        for i, c in reversed(list(enumerate(out_classes))):   #循环图中的几个检测到的物体
+            predicted_class = self.class_names[c]  #类别
+            box = out_boxes[i]    # 框
+            score = out_scores[i]  #置信度
 
-            label = '{} {:.2f}'.format(predicted_class, score)
-            draw = ImageDraw.Draw(image)
-            label_size = draw.textsize(label, font)
+            label = '{} {:.2f}'.format(predicted_class, score)  #标签
+            draw = ImageDraw.Draw(image)   #画图
+            label_size = draw.textsize(label, font)  #标签的字体
+            print("attention")
+            print(label_size)
 
             top, left, bottom, right = box
             top = max(0, np.floor(top + 0.5).astype('int32'))
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-            print(label, (left, top), (right, bottom))
+            print(label, (left, top), (right, bottom))   #边框
 
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -152,14 +156,14 @@ class YOLO(object):
                 text_origin = np.array([left, top + 1])
 
             # My kingdom for a good redistributable image drawing library.
-            for i in range(thickness):
+            for i in range(thickness):     #画框
                 draw.rectangle(
                     [left + i, top + i, right - i, bottom - i],
                     outline=self.colors[c])
-            draw.rectangle(
+            draw.rectangle(       #文字背景
                 [tuple(text_origin), tuple(text_origin + label_size)],
                 fill=self.colors[c])
-            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+            draw.text(text_origin, label, fill=(0, 0, 0), font=font)  #文案
             del draw
 
         end = timer()
