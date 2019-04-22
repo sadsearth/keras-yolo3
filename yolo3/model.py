@@ -185,18 +185,21 @@ def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape)
 
 
 def yolo_eval(yolo_outputs,
-#模型输出，格式如下【（?，13,13,255）（?，26,26,255）（?,52,52,255）】 ?:bitch size;
-              # 13-26-52:多尺度预测； 255：预测值（3*（80+5）
+   #模型输出，格式如下【（?，13,13,255）（?，26,26,255）（?,52,52,255）】 ?:bitch size
+              # 13-26-52:多尺度预测； 255：预测值（3*（80+5））
               anchors,
-              num_classes,
-              image_shape,
+   #[(10,13), (16,30), (33,23), (30,61), (62,45), (59,119), (116,90), (156,198),(373,326)]
+              num_classes,  #coco集80类
+              image_shape,  #placeholder类型的TF参数，默认(416, 416)
               max_boxes=20,
-              score_threshold=.6,
-              iou_threshold=.5):
+   #每张图每类最多检测到20个框同类别框的IoU阈值，大于阈值的重叠框被删除，重叠物体较多，则调高阈值，重叠物体较少，则调低阈值
+              score_threshold=.6,  #框置信度阈值，小于阈值的框被删除
+              iou_threshold=.5): #同类别框的IoU阈值，大于阈值的重叠框被删除，重叠物体较多，则调高阈值，重叠物体较少，则调低阈值
     """Evaluate YOLO model on given input and return filtered boxes."""
     num_layers = len(yolo_outputs)
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]] # default setting
-    input_shape = K.shape(yolo_outputs[0])[1:3] * 32
+    # default setting  #每层分配3个anchor box.如13*13分配到【6,7,8】即【（116,90）（156,198）（373,326）】
+    input_shape = K.shape(yolo_outputs[0])[1:3] * 32  #（416，416）
     boxes = []
     box_scores = []
     for l in range(num_layers):
