@@ -1,5 +1,6 @@
 import numpy as np
 
+#kmeans.py 输入*_annoataion.py得到的txt文件，通过聚类得到数据最佳anchors
 
 class YOLO_Kmeans:
 

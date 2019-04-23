@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-
+#coco_annoataion.py 把json文件转换为txt
 name_box_id = defaultdict(list)
 id_name = dict()
 f = open(

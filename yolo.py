@@ -3,6 +3,14 @@
 Class definition of YOLO_v3 style detection model on image and video
 """
 
+#yolo.py 构建以yolov3为底层构件的yolo检测模型，因为上面的yolov3还是分开的单个函数，
+# 功能并没有融合在一起，即使在训练的时候所有的yolov3组件还是分开的功能，并没有统一接口，
+# 供在模型训练完成之后，直接使用。通过yolo.py融合所有的组件。
+
+#这是yolo的检测文件，yolo检测模型对外提供两个接口：
+#detect_image(self, image) 检测图片，返回图片
+#detect_objects_of_image(self, img_path) 检测图片返回，box的各个值
+
 import colorsys
 import os
 from timeit import default_timer as timer

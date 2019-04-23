@@ -120,25 +120,30 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
 
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
+    # feats:输出的shape，->(?,13,13,255); anchors:每层对应的3个anchor box
+    # num_classes: 类别数（80）; input_shape:（416,416）; image_shape:图像尺寸
     """Convert final layer features to bounding box parameters."""
-    num_anchors = len(anchors)
-    # Reshape to batch, height, width, num_anchors, box_params.
+    num_anchors = len(anchors)  #3
+    # Reshape to batch, height, width, num_anchors, box_params.-> [1, 1, 1, 3, 2]
     anchors_tensor = K.reshape(K.constant(anchors), [1, 1, 1, num_anchors, 2])
-
-    grid_shape = K.shape(feats)[1:3] # height, width
+    grid_shape = K.shape(feats)[1:3] # height, width ->(13,13)
+    # grid_y和grid_x用于生成网格grid，通过arange、reshape、tile的组合，
+    # 创建y轴的0~12的组合grid_y，再创建x轴的0~12的组合grid_x，将两者拼接concatenate，就是grid
     grid_y = K.tile(K.reshape(K.arange(0, stop=grid_shape[0]), [-1, 1, 1, 1]),
         [1, grid_shape[1], 1, 1])
     grid_x = K.tile(K.reshape(K.arange(0, stop=grid_shape[1]), [1, -1, 1, 1]),
         [grid_shape[0], 1, 1, 1])
     grid = K.concatenate([grid_x, grid_y])
-    grid = K.cast(grid, K.dtype(feats))
+    grid = K.cast(grid, K.dtype(feats))  #K.cast():把grid中值的类型变为和feats中值的类型一样
 
     feats = K.reshape(
         feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
-
+    # 将feats的最后一维展开，将anchors与其他数据（类别数+4个框值+框置信度）分离
     # Adjust preditions to each spatial grid point and anchor size.
     box_xy = (K.sigmoid(feats[..., :2]) + grid) / K.cast(grid_shape[::-1], K.dtype(feats))
     box_wh = K.exp(feats[..., 2:4]) * anchors_tensor / K.cast(input_shape[::-1], K.dtype(feats))
+    # xywh的计算公式，tx、ty、tw和th是feats值，而bx、by、bw和bh是输出值
+    # ...操作符，在Python中，“...”(ellipsis)操作符，表示其他维度不变，只操作最前或最后1维
     box_confidence = K.sigmoid(feats[..., 4:5])
     box_class_probs = K.sigmoid(feats[..., 5:])
 
@@ -147,7 +152,7 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     return box_xy, box_wh, box_confidence, box_class_probs
 
 
-def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
+def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):  #得到正确的x,y,w,h
     '''Get corrected boxes'''
     box_yx = box_xy[..., ::-1]
     box_hw = box_wh[..., ::-1]
@@ -174,13 +179,21 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
 
 
 def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape):
+    # feats:输出的shape，->(?,13,13,255); anchors:每层对应的3个anchor box
+    # num_classes: 类别数（80）; input_shape:（416,416）; image_shape:图像尺寸
     '''Process Conv layer output'''
     box_xy, box_wh, box_confidence, box_class_probs = yolo_head(feats,
         anchors, num_classes, input_shape)
+    # yolo_head():box_xy是box的中心坐标，(0~1)相对位置；box_wh是box的宽高，(0~1)相对值；
+    # box_confidence是框中物体置信度；box_class_probs是类别置信度
     boxes = yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape)
+    # 将box_xy和box_wh的(0~1)相对值，转换为真实坐标，输出boxes是(y_min,x_min,y_max,x_max)的值
     boxes = K.reshape(boxes, [-1, 4])
+    # reshape,将不同网格的值转换为框的列表。即（?,13,13,3,4）->(?,4)  ？：框的数目
     box_scores = box_confidence * box_class_probs
+    # 框的得分=框的置信度*类别置信度
     box_scores = K.reshape(box_scores, [-1, num_classes])
+    # reshape,将框的得分展平，变为(?,80); ?:框的数目
     return boxes, box_scores
 
 
@@ -207,29 +220,30 @@ def yolo_eval(yolo_outputs,
             anchors[anchor_mask[l]], num_classes, input_shape, image_shape)
         boxes.append(_boxes)
         box_scores.append(_box_scores)
-    boxes = K.concatenate(boxes, axis=0)
-    box_scores = K.concatenate(box_scores, axis=0)
+    boxes = K.concatenate(boxes, axis=0)  #K.concatenate:将数据展平 ->(?,4)
+    box_scores = K.concatenate(box_scores, axis=0)  # ->(?,)
 
-    mask = box_scores >= score_threshold
-    max_boxes_tensor = K.constant(max_boxes, dtype='int32')
+    mask = box_scores >= score_threshold  #MASK掩码，过滤小于score阈值的值，只保留大于阈值的值
+    max_boxes_tensor = K.constant(max_boxes, dtype='int32')  #最大检测框数20
     boxes_ = []
     scores_ = []
     classes_ = []
     for c in range(num_classes):
         # TODO: use keras backend instead of tf.
-        class_boxes = tf.boolean_mask(boxes, mask[:, c])
-        class_box_scores = tf.boolean_mask(box_scores[:, c], mask[:, c])
-        nms_index = tf.image.non_max_suppression(
+        class_boxes = tf.boolean_mask(boxes, mask[:, c]) #通过掩码MASK和类别c筛选框boxes
+        class_box_scores = tf.boolean_mask(box_scores[:, c], mask[:, c])#通过掩码MASK和类别C筛选scores
+        nms_index = tf.image.non_max_suppression(   #运行nms
             class_boxes, class_box_scores, max_boxes_tensor, iou_threshold=iou_threshold)
-        class_boxes = K.gather(class_boxes, nms_index)
-        class_box_scores = K.gather(class_box_scores, nms_index)
-        classes = K.ones_like(class_box_scores, 'int32') * c
+        class_boxes = K.gather(class_boxes, nms_index)  #K.gather:根据索引nms_index选择class_boxes
+        class_box_scores = K.gather(class_box_scores, nms_index) #根据索引nms_index选择class_box_score
+        classes = K.ones_like(class_box_scores, 'int32') * c  #计算类的框得分
         boxes_.append(class_boxes)
         scores_.append(class_box_scores)
         classes_.append(classes)
     boxes_ = K.concatenate(boxes_, axis=0)
-    scores_ = K.concatenate(scores_, axis=0)
-    classes_ = K.concatenate(classes_, axis=0)
+    # K.concatenate().将相同维度的数据连接在一起；把boxes_展平。  -> 变成格式:(?,4);  ?:框的个数；4：（x,y,w,h）
+    scores_ = K.concatenate(scores_, axis=0)     #变成格式（?,）
+    classes_ = K.concatenate(classes_, axis=0)   #变成格式（?,）
 
     return boxes_, scores_, classes_
 
