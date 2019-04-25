@@ -28,7 +28,7 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'model_data/yolo.h5',  #训练好的模型
+        "model_path": 'model_data/yolo_weights.h5',  #训练好的模型
         "anchors_path": 'model_data/yolo_anchors.txt',  # anchor box 9个， 从小到大排列
         "classes_path": 'model_data/coco_classes.txt',  #类别数
         "score" : 0.3,   #score阈值
